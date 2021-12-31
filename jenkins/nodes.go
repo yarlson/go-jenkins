@@ -45,7 +45,7 @@ type Node struct {
 	RemoteFS           string              `json:"remoteFS"`
 	NumExecutors       int                 `json:"numExecutors"`
 	Mode               NodeMode            `json:"mode"`
-	Type               string              `json:"type"`
+	Type               NodeType            `json:"type"`
 	Labels             Labels              `json:"labelString"`
 	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy"`
 	NodeProperties     *NodeProperties     `json:"nodeProperties"`
@@ -57,9 +57,22 @@ type RetentionsStrategy struct {
 	StaplerClass string `json:"stapler-class"`
 }
 
+// DefaultRetentionsStrategy represents the default retention strategy.
+func DefaultRetentionsStrategy() *RetentionsStrategy {
+	return &RetentionsStrategy{StaplerClass: "hudson.slaves.RetentionStrategy$Always"}
+}
+
 // NodeProperties represents a Jenkins node properties.
 type NodeProperties struct {
 	StaplerClassBag string `json:"stapler-class-bag"`
+}
+
+// NodeType represents a Jenkins node type.
+type NodeType string
+
+// DefaultNodeType represents the default Jenkins node type.
+func DefaultNodeType() NodeType {
+	return "hudson.slaves.DumbSlave$DescriptorImpl"
 }
 
 // DefaultNodeProperties returns the default node properties.
@@ -83,9 +96,9 @@ func DefaultJNLPLauncher() *JNLPLauncher {
 
 // NodeRequest represents a Jenkins node request.
 type NodeRequest struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	JSON string `json:"json"`
+	Name string   `json:"name"`
+	Type NodeType `json:"type"`
+	JSON string   `json:"json"`
 }
 
 type NodesListResponse struct {
@@ -183,6 +196,18 @@ func (s *NodesService) Create(ctx context.Context, node *Node) (*Node, *http.Res
 
 	if node.NodeProperties == nil {
 		node.NodeProperties = DefaultNodeProperties()
+	}
+
+	if node.Type == "" {
+		node.Type = DefaultNodeType()
+	}
+
+	if node.NumExecutors == 0 {
+		node.NumExecutors = 1
+	}
+
+	if node.RetentionsStrategy == nil {
+		node.RetentionsStrategy = DefaultRetentionsStrategy()
 	}
 
 	str, err := json.Marshal(node)
