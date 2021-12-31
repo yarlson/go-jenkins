@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-func TestNodeServiceCreateNode(t *testing.T) {
+func TestNodesCreate(t *testing.T) {
 	randBytes := make([]byte, 16)
 	rand.Seed(time.Now().UnixNano())
 	rand.Read(randBytes)
@@ -56,14 +56,57 @@ func TestNodeServiceCreateNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := jenkins.NewClient(nil, "http://localhost:8080/", "admin", "admin")
+			client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+			if err != nil {
+				t.Errorf("Nodes create() error = %v", err)
+				return
+			}
+
 			got, _, err := client.Nodes.Create(context.Background(), tt.args.node)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("createNode() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Nodes create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got.Name, tt.want) {
-				t.Errorf("createNode() got = %v, want %v", got, tt.want)
+				t.Errorf("Nodes create() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNodesList(t *testing.T) {
+	randBytes := make([]byte, 16)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(randBytes)
+	name := hex.EncodeToString(randBytes)
+
+	tests := []struct {
+		name    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "list nodes",
+			want:    name,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+			if err != nil {
+				t.Errorf("Nodes list() error = %v", err)
+				return
+			}
+
+			got, _, err := client.Nodes.List(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Nodes list() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(got) < 1 {
+				t.Errorf("Nodes list() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

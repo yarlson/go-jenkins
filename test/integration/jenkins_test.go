@@ -16,7 +16,12 @@ import (
 )
 
 func TestClientSetCrumbs(t *testing.T) {
-	client := jenkins.NewClient(nil, `http://localhost:8080/`, "admin", "admin")
+	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+
+	if err != nil {
+		t.Errorf("getCrumbs() error = %v", err)
+		return
+	}
 
 	tests := []struct {
 		name    string

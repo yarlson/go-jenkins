@@ -19,13 +19,25 @@ import (
 
 const (
 	// crumbURL is the URL to issue a crumb request.
-	crumbURL = "/crumbIssuer/api/json"
+	crumbURL       = "/crumbIssuer/api/json"
+	defaultBaseURL = "http://127.0.0.1:8080"
 )
 
 // Crumbs represents Jenkins CSRF Crumbs
 type Crumbs struct {
 	Value        string `json:"crumb"`
 	RequestField string `json:"crumbRequestField"`
+}
+
+type BasicAuthTransport struct {
+	Username string
+	Password string
+}
+
+func (bat BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(bat.Username, bat.Password)
+
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 // A Client manages communication with the Jenkins API.
@@ -40,6 +52,7 @@ type Client struct {
 
 	baseURL  string
 	userName string
+	password string
 	apiToken string
 
 	Nodes *NodesService
@@ -49,18 +62,78 @@ type service struct {
 	client *Client
 }
 
+type ClientOption func(*Client) error
+
+func WithClient(client *http.Client) ClientOption {
+	return func(c *Client) error {
+		c.httpClient = client
+
+		return nil
+	}
+}
+
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		c.baseURL = baseURL
+
+		return nil
+	}
+}
+
+func WithPassword(userName, password string) ClientOption {
+	return func(c *Client) error {
+		if c.apiToken != "" {
+			return fmt.Errorf("cannot set both API token and password")
+		}
+		c.userName = userName
+		c.password = password
+
+		return nil
+	}
+}
+
+func WithToken(userName, apiToken string) ClientOption {
+	return func(c *Client) error {
+		if c.password != "" {
+			return fmt.Errorf("cannot set both API token and password")
+		}
+		c.userName = userName
+		c.apiToken = apiToken
+
+		return nil
+	}
+}
+
+func DefaultHttpClient() *http.Client {
+	jar, _ := cookiejar.New(nil)
+	return &http.Client{Jar: jar}
+}
+
 // NewClient returns a new Jenkins API client.
-func NewClient(httpClient *http.Client, baseURL string, userName string, apiToken string) *Client {
-	if httpClient == nil {
-		jar, _ := cookiejar.New(nil)
-		httpClient = &http.Client{Jar: jar}
+func NewClient(opts ...ClientOption) (*Client, error) {
+	c := &Client{baseURL: defaultBaseURL}
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
-	c := &Client{httpClient: httpClient, baseURL: baseURL, userName: userName, apiToken: apiToken}
+	if c.httpClient == nil {
+		c.httpClient = DefaultHttpClient()
+	}
+
+	if c.apiToken != "" {
+		c.httpClient.Transport = BasicAuthTransport{Username: c.userName, Password: c.apiToken}
+	}
+
+	if c.password != "" {
+		c.httpClient.Transport = BasicAuthTransport{Username: c.userName, Password: c.password}
+	}
+
 	c.common.client = c
 	c.Nodes = (*NodesService)(&c.common)
 
-	return c
+	return c, nil
 }
 
 // SetCrumbs sets the Crumbs for the client.
@@ -92,7 +165,7 @@ func (c *Client) SetCrumbs(ctx context.Context) (*http.Response, error) {
 
 // NewRequest creates an API request. A relative URL can be provided in query,
 func (c *Client) NewRequest(ctx context.Context, method string, query string, body io.Reader) (*http.Request, error) {
-	query = strings.TrimPrefix(query, "/")
+	query = "/" + strings.TrimPrefix(query, "/")
 	req, err := http.NewRequestWithContext(
 		ctx,
 		method,
@@ -103,13 +176,12 @@ func (c *Client) NewRequest(ctx context.Context, method string, query string, bo
 		return nil, err
 	}
 
-	req.SetBasicAuth(c.userName, c.apiToken)
-
 	return req, nil
 }
 
 // NewFormRequest creates an API request with form data.
-func (c *Client) NewFormRequest(ctx context.Context, query string, body io.Reader) (*http.Request, error) {
+func (c *Client) NewFormRequest(ctx context.Context, query string, values url.Values) (*http.Request, error) {
+	body := strings.NewReader(values.Encode())
 	req, err := c.NewRequest(ctx, "POST", query, body)
 	if err != nil {
 		return nil, err
@@ -135,6 +207,10 @@ func (c *Client) Get(ctx context.Context, query string) (*http.Response, error) 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return resp, err
+	}
+
+	if resp.StatusCode > 299 {
+		return resp, fmt.Errorf("%d %s", resp.StatusCode, resp.Status)
 	}
 
 	if c.httpClient.Jar != nil {
@@ -171,7 +247,7 @@ func (c *Client) PostForm(ctx context.Context, query string, body interface{}) (
 
 	values := convertBodyStruct(body)
 
-	req, _ := c.NewFormRequest(ctx, query, strings.NewReader(values.Encode()))
+	req, _ := c.NewFormRequest(ctx, query, values)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
