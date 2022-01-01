@@ -28,6 +28,16 @@ func (s *Suite) newMux() {
 	s.server = httptest.NewServer(s.mux)
 }
 
+func (s *Suite) addCrumbsHandle() {
+	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "GET")
+		_, err := w.Write([]byte(
+			`{"crumbRequestField":"crumb", "crumb":"crumb"}`,
+		))
+		s.NoError(err)
+	})
+}
+
 func TestSuite(t *testing.T) {
 	s := new(Suite)
 
@@ -79,7 +89,7 @@ func (s *Suite) TestClientNewRequest() {
 	client, err := NewClient()
 	s.NoError(err)
 
-	_, err = client.NewRequest(context.Background(), "GET", "/", nil)
+	_, err = client.newRequest(context.Background(), "GET", "/", nil)
 
 	s.NoError(err)
 }
@@ -89,7 +99,7 @@ func (s *Suite) TestClientNewRequestError() {
 	s.NoError(err)
 
 	//lint:ignore SA1012 this is a test
-	_, err = client.NewRequest(nil, "GET", "/", nil)
+	_, err = client.newRequest(nil, "GET", "/", nil)
 	s.Error(err)
 }
 
@@ -111,7 +121,7 @@ func (s *Suite) TestClientGet() {
 		s.Equal("Basic YWRtaW46YWRtaW4=", r.Header.Get("Authorization"))
 	})
 
-	got, err := client.Get(context.Background(), "test")
+	got, err := client.get(context.Background(), "test")
 	s.NoError(err)
 	s.Equal(got.StatusCode, http.StatusOK)
 
@@ -125,7 +135,7 @@ func (s *Suite) TestClientGetNotFound() {
 	client, err := NewClient(WithBaseURL(s.server.URL))
 	s.NoError(err)
 
-	got, err := client.Get(context.Background(), "test_error")
+	got, err := client.get(context.Background(), "test_error")
 	s.Error(err)
 	s.Equal(got.StatusCode, http.StatusNotFound)
 }
@@ -135,7 +145,7 @@ func (s *Suite) TestClientGetErrorContext() {
 	s.NoError(err)
 
 	//lint:ignore SA1012 this is a test
-	_, err = client.Get(nil, "test_error")
+	_, err = client.get(nil, "test_error")
 	s.Error(err)
 }
 
@@ -146,7 +156,7 @@ func (s *Suite) TestClientGetErrorResponse() {
 	deadCtx, cancel := context.WithDeadline(context.Background(), time.Now())
 	defer cancel()
 
-	_, err = client.Get(deadCtx, "test_error")
+	_, err = client.get(deadCtx, "test_error")
 	s.Error(err)
 }
 
@@ -160,7 +170,7 @@ func (s *Suite) TestClientGetCookie() {
 		w.Header().Set("Set-Cookie", "test=cookie")
 	})
 
-	got, err := client.Get(context.Background(), "test_cookie")
+	got, err := client.get(context.Background(), "test_cookie")
 	s.NoError(err)
 	s.Equal(got.StatusCode, http.StatusOK)
 
@@ -175,7 +185,7 @@ func (s *Suite) TestClientNewFormRequest() {
 	s.NoError(err)
 
 	values := make(url.Values)
-	_, err = client.NewFormRequest(context.Background(), "/", values)
+	_, err = client.newFormRequest(context.Background(), "/", values)
 
 	s.NoError(err)
 }
@@ -187,7 +197,7 @@ func (s *Suite) TestClientNewFormRequestWithCrumbs() {
 	client.Crumbs = &Crumbs{RequestField: "crumbRequestField", Value: "crumb"}
 
 	values := make(url.Values)
-	got, err := client.NewFormRequest(context.Background(), "/", values)
+	got, err := client.newFormRequest(context.Background(), "/", values)
 	s.NoError(err)
 	s.Equal(got.Header.Get("crumbRequestField"), "crumb")
 }
@@ -198,7 +208,7 @@ func (s *Suite) TestClientNewFormRequestError() {
 
 	values := make(url.Values)
 	//lint:ignore SA1012 this is a test
-	_, err = client.NewFormRequest(nil, "/", values)
+	_, err = client.newFormRequest(nil, "/", values)
 	s.Error(err)
 }
 
@@ -215,7 +225,7 @@ func (s *Suite) TestClientSetCrumbs() {
 		s.NoError(err)
 	})
 
-	got, err := client.SetCrumbs(context.Background())
+	got, err := client.setCrumbs(context.Background())
 	s.NoError(err)
 	s.Equal(got.StatusCode, http.StatusOK)
 }
@@ -230,7 +240,7 @@ func (s *Suite) TestClientSetCrumbsErrorGet() {
 	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {})
 
 	//lint:ignore SA1012 this is a test
-	_, err = client.SetCrumbs(nil)
+	_, err = client.setCrumbs(nil)
 	s.Error(err)
 }
 
@@ -247,7 +257,7 @@ func (s *Suite) TestClientSetCrumbsErrorUnmarshal() {
 		s.NoError(err)
 	})
 
-	_, err = client.SetCrumbs(context.Background())
+	_, err = client.setCrumbs(context.Background())
 	s.Error(err)
 }
 
@@ -260,13 +270,7 @@ func (s *Suite) TestClientPostForm() {
 		A string `json:"a"`
 	}
 
-	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {
-		s.testMethod(r, "GET")
-		_, err := w.Write([]byte(
-			`{"crumbRequestField":"crumb", "crumb":"crumb"}`,
-		))
-		s.NoError(err)
-	})
+	s.addCrumbsHandle()
 
 	s.mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "POST")
@@ -276,7 +280,7 @@ func (s *Suite) TestClientPostForm() {
 		s.NoError(err)
 	})
 
-	_, err = client.PostForm(context.Background(), "post", &PostBody{A: "B"})
+	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.NoError(err)
 }
 
@@ -289,7 +293,7 @@ func (s *Suite) TestClientPostFormCrumbError() {
 		A string `json:"a"`
 	}
 
-	_, err = client.PostForm(context.Background(), "post", &PostBody{A: "B"})
+	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.Error(err)
 }
 
@@ -302,19 +306,13 @@ func (s *Suite) TestClientPostFormStatusError() {
 		A string `json:"a"`
 	}
 
-	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {
-		s.testMethod(r, "GET")
-		_, err := w.Write([]byte(
-			`{"crumbRequestField":"crumb", "crumb":"crumb"}`,
-		))
-		s.NoError(err)
-	})
+	s.addCrumbsHandle()
 
 	s.mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("500 - Something bad happened!"))
 		s.NoError(err)
 	})
-	_, err = client.PostForm(context.Background(), "post", &PostBody{A: "B"})
+	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.Error(err)
 }

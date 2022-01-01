@@ -136,9 +136,9 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	return c, nil
 }
 
-// SetCrumbs sets the Crumbs for the client.
-func (c *Client) SetCrumbs(ctx context.Context) (*http.Response, error) {
-	resp, err := c.Get(ctx, crumbURL)
+// setCrumbs sets the Crumbs for the client.
+func (c *Client) setCrumbs(ctx context.Context) (*http.Response, error) {
+	resp, err := c.get(ctx, crumbURL)
 	if err != nil {
 		return resp, err
 	}
@@ -163,8 +163,8 @@ func (c *Client) SetCrumbs(ctx context.Context) (*http.Response, error) {
 	return resp, nil
 }
 
-// NewRequest creates an API request. A relative URL can be provided in query,
-func (c *Client) NewRequest(ctx context.Context, method string, query string, body io.Reader) (*http.Request, error) {
+// newRequest creates an API request. A relative URL can be provided in query,
+func (c *Client) newRequest(ctx context.Context, method string, query string, body io.Reader) (*http.Request, error) {
 	query = "/" + strings.TrimPrefix(query, "/")
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -179,10 +179,10 @@ func (c *Client) NewRequest(ctx context.Context, method string, query string, bo
 	return req, nil
 }
 
-// NewFormRequest creates an API request with form data.
-func (c *Client) NewFormRequest(ctx context.Context, query string, values url.Values) (*http.Request, error) {
+// newFormRequest creates an API request with form data.
+func (c *Client) newFormRequest(ctx context.Context, query string, values url.Values) (*http.Request, error) {
 	body := strings.NewReader(values.Encode())
-	req, err := c.NewRequest(ctx, "POST", query, body)
+	req, err := c.newRequest(ctx, "POST", query, body)
 	if err != nil {
 		return nil, err
 	}
@@ -197,9 +197,9 @@ func (c *Client) NewFormRequest(ctx context.Context, query string, values url.Va
 	return req, nil
 }
 
-// Get issues a GET to the specified path.
-func (c *Client) Get(ctx context.Context, query string) (*http.Response, error) {
-	req, err := c.NewRequest(ctx, "GET", query, nil)
+// get issues a GET to the specified path.
+func (c *Client) get(ctx context.Context, query string) (*http.Response, error) {
+	req, err := c.newRequest(ctx, "GET", query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -238,16 +238,16 @@ func convertBodyStruct(body interface{}) url.Values {
 	return values
 }
 
-// PostForm issues a POST to the specified path with the given form data.
-func (c *Client) PostForm(ctx context.Context, query string, body interface{}) (*http.Response, error) {
-	crumbsResp, err := c.SetCrumbs(ctx)
+// postForm issues a POST to the specified path with the given form data.
+func (c *Client) postForm(ctx context.Context, query string, body interface{}) (*http.Response, error) {
+	crumbsResp, err := c.setCrumbs(ctx)
 	if err != nil {
 		return crumbsResp, err
 	}
 
 	values := convertBodyStruct(body)
 
-	req, _ := c.NewFormRequest(ctx, query, values)
+	req, _ := c.newFormRequest(ctx, query, values)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

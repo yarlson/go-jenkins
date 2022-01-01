@@ -52,6 +52,28 @@ type Node struct {
 	Launcher           interface{}         `json:"launcher"`
 }
 
+func (n *Node) fillInNodeDefaults() {
+	if n.Launcher == nil {
+		n.Launcher = DefaultJNLPLauncher()
+	}
+
+	if n.NodeProperties == nil {
+		n.NodeProperties = DefaultNodeProperties()
+	}
+
+	if n.Type == "" {
+		n.Type = DefaultNodeType()
+	}
+
+	if n.NumExecutors == 0 {
+		n.NumExecutors = 1
+	}
+
+	if n.RetentionsStrategy == nil {
+		n.RetentionsStrategy = DefaultRetentionsStrategy()
+	}
+}
+
 // RetentionsStrategy represents a Jenkins node retention strategy.
 type RetentionsStrategy struct {
 	StaplerClass string `json:"stapler-class"`
@@ -120,6 +142,7 @@ type LoadStatistics struct {
 	Class string `json:"_class"`
 }
 
+// SwapSpaceMonitor checks the swap space availability.
 type SwapSpaceMonitor struct {
 	Class                   string `json:"_class"`
 	AvailablePhysicalMemory int64  `json:"availablePhysicalMemory"`
@@ -128,6 +151,7 @@ type SwapSpaceMonitor struct {
 	TotalSwapSpace          int    `json:"totalSwapSpace"`
 }
 
+// TemporarySpaceMonitor monitors the disk space of "/tmp".
 type TemporarySpaceMonitor struct {
 	Class     string `json:"_class"`
 	Timestamp int64  `json:"timestamp"`
@@ -135,6 +159,7 @@ type TemporarySpaceMonitor struct {
 	Size      int64  `json:"size"`
 }
 
+// DiskSpaceMonitor checks available disk space of the remote FS root.
 type DiskSpaceMonitor struct {
 	Class     string `json:"_class"`
 	Timestamp int64  `json:"timestamp"`
@@ -142,17 +167,20 @@ type DiskSpaceMonitor struct {
 	Size      int64  `json:"size"`
 }
 
+// ResponseTimeMonitor monitors the round-trip response time to this agent.
 type ResponseTimeMonitor struct {
 	Class     string `json:"_class"`
 	Timestamp int64  `json:"timestamp"`
 	Average   int    `json:"average"`
 }
 
+// ClockMonitor checks clock of a node to detect out of sync clocks.
 type ClockMonitor struct {
 	Class string `json:"_class"`
 	Diff  int    `json:"diff"`
 }
 
+// MonitorData expose monitoring data
 type MonitorData struct {
 	SwapSpaceMonitor      SwapSpaceMonitor      `json:"hudson.node_monitors.SwapSpaceMonitor"`
 	TemporarySpaceMonitor TemporarySpaceMonitor `json:"hudson.node_monitors.TemporarySpaceMonitor"`
@@ -190,25 +218,7 @@ type NodesService service
 
 // Create creates a new Jenkins node.
 func (s *NodesService) Create(ctx context.Context, node *Node) (*Node, *http.Response, error) {
-	if node.Launcher == nil {
-		node.Launcher = DefaultJNLPLauncher()
-	}
-
-	if node.NodeProperties == nil {
-		node.NodeProperties = DefaultNodeProperties()
-	}
-
-	if node.Type == "" {
-		node.Type = DefaultNodeType()
-	}
-
-	if node.NumExecutors == 0 {
-		node.NumExecutors = 1
-	}
-
-	if node.RetentionsStrategy == nil {
-		node.RetentionsStrategy = DefaultRetentionsStrategy()
-	}
+	node.fillInNodeDefaults()
 
 	str, err := json.Marshal(node)
 	if err != nil {
@@ -221,7 +231,7 @@ func (s *NodesService) Create(ctx context.Context, node *Node) (*Node, *http.Res
 		JSON: string(str),
 	}
 
-	resp, err := s.client.PostForm(ctx, NodesCreateURL, nodeRequest)
+	resp, err := s.client.postForm(ctx, NodesCreateURL, nodeRequest)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -230,7 +240,7 @@ func (s *NodesService) Create(ctx context.Context, node *Node) (*Node, *http.Res
 }
 
 func (s *NodesService) List(ctx context.Context) ([]Node, *http.Response, error) {
-	resp, err := s.client.Get(ctx, NodesListURL)
+	resp, err := s.client.get(ctx, NodesListURL)
 	if err != nil {
 		return nil, resp, err
 	}
