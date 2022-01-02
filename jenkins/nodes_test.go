@@ -2,6 +2,7 @@ package jenkins
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
 
@@ -72,5 +73,96 @@ func (s *Suite) TestNodesServiceListError() {
 
 	//lint:ignore SA1012 this is a test
 	_, _, err = client.Nodes.List(nil)
+	s.Error(err)
+}
+
+func (s *Suite) TestNodesServiceListUnmarshalError() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc(NodesListURL, func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "GET")
+		_, err := w.Write([]byte(
+			`{"computer":[{"displayName": `,
+		))
+		s.NoError(err)
+	})
+	_, _, err = client.Nodes.List(context.Background())
+	s.Error(err)
+}
+
+func (s *Suite) TestNodesServiceGet() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "GET")
+		_, err := w.Write([]byte(
+			`
+<?xml version="1.1" encoding="UTF-8"?>
+<slave>
+  <name>test</name>
+  <description></description>
+  <remoteFS>/var/lib/jenkins</remoteFS>
+  <numExecutors>1</numExecutors>
+  <mode>EXCLUSIVE</mode>
+  <retentionStrategy class="hudson.slaves.RetentionStrategy$Always"/>
+  <launcher class="hudson.slaves.JNLPLauncher">
+    <workDirSettings>
+      <disabled>false</disabled>
+      <internalDir>remoting</internalDir>
+      <failIfWorkDirIsMissing>false</failIfWorkDirIsMissing>
+    </workDirSettings>
+    <webSocket>false</webSocket>
+  </launcher>
+  <label>test</label>
+  <nodeProperties/>
+</slave>
+`,
+		))
+		s.NoError(err)
+	})
+
+	node, _, err := client.Nodes.Get(context.Background(), "test")
+
+	s.NoError(err)
+	s.Equal("test", node.Name)
+	s.IsType(&JNLPLauncher{}, node.Launcher)
+}
+
+func (s *Suite) TestNodesServiceGetError() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	_, _, err = client.Nodes.Get(context.Background(), "test")
+
+	s.Error(err)
+}
+
+func (s *Suite) TestNodesServiceGetUnmarshalError() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "GET")
+		_, err := w.Write([]byte(
+			`
+<?xml version="2.0" encoding="UTF-8"?>
+<slave>
+
+</slave>
+`,
+		))
+		s.NoError(err)
+	})
+
+	_, _, err = client.Nodes.Get(context.Background(), "test")
+
 	s.Error(err)
 }

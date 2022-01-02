@@ -8,6 +8,7 @@ package jenkins
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,7 @@ const (
 	// NodesCreateURL is the URL to create a new node
 	NodesCreateURL = "/computer/doCreateItem"
 	NodesListURL   = "/computer/api/json"
+	NodesGetURL    = "/computer/%s/config.xml"
 )
 
 // Labels represents Jenkins node labels.
@@ -40,16 +42,51 @@ func (l Labels) MarshalJSON() ([]byte, error) {
 
 // Node represents a Jenkins node.
 type Node struct {
-	Name               string              `json:"name"`
-	NodeDescription    string              `json:"nodeDescription"`
-	RemoteFS           string              `json:"remoteFS"`
-	NumExecutors       int                 `json:"numExecutors"`
-	Mode               NodeMode            `json:"mode"`
-	Type               NodeType            `json:"type"`
-	Labels             Labels              `json:"labelString"`
-	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy"`
-	NodeProperties     *NodeProperties     `json:"nodeProperties"`
-	Launcher           interface{}         `json:"launcher"`
+	Name               string              `json:"name" xml:"name"`
+	NodeDescription    string              `json:"nodeDescription" xml:"nodeDescription"`
+	RemoteFS           string              `json:"remoteFS" xml:"remoteFS"`
+	NumExecutors       int                 `json:"numExecutors" xml:"numExecutors"`
+	Mode               NodeMode            `json:"mode" xml:"mode"`
+	Type               NodeType            `json:"type" xml:"type"`
+	Labels             Labels              `json:"labelString" xml:"label"`
+	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy" xml:"retentionsStrategy"`
+	NodeProperties     *NodeProperties     `json:"nodeProperties" xml:"nodeProperties"`
+	Launcher           interface{}         `json:"launcher" xml:"launcher"`
+}
+
+func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type Alias Node // avoids recursive unmarshal
+	v := &struct {
+		Launcher struct {
+			InnerXML []byte `xml:",innerxml"`  // Stores inner XML of the <launcher> element
+			Class    string `xml:"class,attr"` // Stores the class name from the <class> attribute
+		} `xml:"launcher"`
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+
+	if err := d.DecodeElement(v, &start); err != nil {
+		return err
+	}
+
+	// Converts InnerXML to a valid XMl document
+	launcherXML := []byte(fmt.Sprintf("<root>%s</root>", v.Launcher.InnerXML))
+
+	switch v.Launcher.Class {
+	case "hudson.slaves.JNLPLauncher":
+		n.Launcher = &JNLPLauncher{}
+		err := xml.Unmarshal(launcherXML, n.Launcher)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type Launcher struct {
+	Class string `xml:"launcherType"`
 }
 
 func (n *Node) fillInNodeDefaults() {
@@ -106,7 +143,13 @@ func DefaultNodeProperties() *NodeProperties {
 
 // JNLPLauncher represents a Jenkins JNLP launcher.
 type JNLPLauncher struct {
-	StaplerClass string `json:"stapler-class"`
+	StaplerClass    string `json:"stapler-class"`
+	WebSocket       bool   `json:"websocket" xml:"websocket,omitempty"`
+	WorkDirSettings struct {
+		Disabled               bool   `json:"disabled" xml:"disabled"`
+		InternalDir            string `json:"internalDir" xml:"internalDir"`
+		FailIfWorkDirIsMissing bool   `json:"failIfWorkDirIsMissing" xml:"failIfWorkDirIsMissing"`
+	} `json:"workDirSettings,omitempty" xml:"workDirSettings,omitempty"`
 }
 
 // DefaultJNLPLauncher returns the default JNLP launcher.
@@ -270,4 +313,32 @@ func (s *NodesService) List(ctx context.Context) ([]Node, *http.Response, error)
 	}
 
 	return nodes, nil, nil
+}
+
+func (s *NodesService) Get(ctx context.Context, name string) (*Node, *http.Response, error) {
+	resp, err := s.client.get(ctx, fmt.Sprintf(NodesGetURL, name))
+	if err != nil {
+		return nil, resp, err
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	// Golang cannot unmarshal xml 1.1 documents.
+	// Jenkins XMLs are basically 1.0 documents.
+	body = []byte(strings.Replace(string(body), "xml version=\"1.1\"", "xml version=\"1.0\"", -1))
+
+	var node Node
+	err = xml.Unmarshal(body, &node)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return &node, nil, nil
 }
