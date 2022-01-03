@@ -34,7 +34,7 @@ func (s *Suite) TestNodesCreate() {
 
 	node := &jenkins.Node{
 		Name:               name,
-		NodeDescription:    "",
+		Description:        "",
 		RemoteFS:           "/var/lib/jenkins",
 		NumExecutors:       1,
 		Mode:               jenkins.NodeModeExclusive,
@@ -58,4 +58,34 @@ func (s *Suite) TestNodesList() {
 	got, _, err := client.Nodes.List(context.Background())
 	s.NoError(err)
 	s.Greater(len(got), 0)
+}
+
+func (s *Suite) TestNodesUpdate() {
+	randBytes := make([]byte, 16)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(randBytes)
+	name := hex.EncodeToString(randBytes)
+
+	node := &jenkins.Node{
+		Name:               name,
+		Description:        "",
+		RemoteFS:           "/var/lib/jenkins",
+		NumExecutors:       1,
+		Mode:               jenkins.NodeModeExclusive,
+		Type:               "hudson.slaves.DumbSlave$DescriptorImpl",
+		Labels:             []string{"test"},
+		RetentionsStrategy: &jenkins.RetentionsStrategy{StaplerClass: "hudson.slaves.RetentionStrategy$Always"},
+	}
+
+	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	got, _, err := client.Nodes.Create(context.Background(), node)
+	s.NoError(err)
+	s.Equal(name, got.Name)
+
+	node.Description = "updated"
+	node, _, err = client.Nodes.Update(context.Background(), node)
+	s.NoError(err)
+	s.Equal("updated", node.Description)
 }

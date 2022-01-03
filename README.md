@@ -2,6 +2,8 @@
 
 go-jenkins is a Go client library for accessing the Jenkins API.
 
+❗️❗️❗️ The library is in active development and is not yet ready for use!
+
 ## Installation
 go-jenkins is compatible with modern Go releases in module mode, with Go installed:
 ```shell
@@ -34,7 +36,7 @@ func main() {
 
 	node, _, err := client.Nodes.Create(context.Background(), &jenkins.Node{
 		Name:            "test-node",
-		NodeDescription: "",
+		Description: "",
 		RemoteFS:        "/var/lib/jenkins",
 		NumExecutors:    1,
 		Mode:            jenkins.NodeModeExclusive,

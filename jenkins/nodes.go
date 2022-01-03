@@ -42,15 +42,17 @@ func (l Labels) MarshalJSON() ([]byte, error) {
 
 // Node represents a Jenkins node.
 type Node struct {
+	XMLName xml.Name `xml:"slave"`
+
 	Name               string              `json:"name" xml:"name"`
-	NodeDescription    string              `json:"nodeDescription" xml:"nodeDescription"`
+	Description        string              `json:"nodeDescription" xml:"description"`
 	RemoteFS           string              `json:"remoteFS" xml:"remoteFS"`
 	NumExecutors       int                 `json:"numExecutors" xml:"numExecutors"`
 	Mode               NodeMode            `json:"mode" xml:"mode"`
 	Type               NodeType            `json:"type" xml:"type"`
 	Labels             Labels              `json:"labelString" xml:"label"`
 	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy" xml:"retentionsStrategy"`
-	NodeProperties     *NodeProperties     `json:"nodeProperties" xml:"nodeProperties"`
+	Properties         *NodeProperties     `json:"nodeProperties" xml:"nodeProperties"`
 	Launcher           interface{}         `json:"launcher" xml:"launcher"`
 }
 
@@ -94,8 +96,8 @@ func (n *Node) fillInNodeDefaults() {
 		n.Launcher = DefaultJNLPLauncher()
 	}
 
-	if n.NodeProperties == nil {
-		n.NodeProperties = DefaultNodeProperties()
+	if n.Properties == nil {
+		n.Properties = DefaultNodeProperties()
 	}
 
 	if n.Type == "" {
@@ -113,7 +115,7 @@ func (n *Node) fillInNodeDefaults() {
 
 // RetentionsStrategy represents a Jenkins node retention strategy.
 type RetentionsStrategy struct {
-	StaplerClass string `json:"stapler-class"`
+	StaplerClass string `json:"stapler-class" xml:"class,attr"`
 }
 
 // DefaultRetentionsStrategy represents the default retention strategy.
@@ -143,7 +145,7 @@ func DefaultNodeProperties() *NodeProperties {
 
 // JNLPLauncher represents a Jenkins JNLP launcher.
 type JNLPLauncher struct {
-	StaplerClass    string `json:"stapler-class"`
+	StaplerClass    string `json:"stapler-class" xml:"class,attr"`
 	WebSocket       bool   `json:"websocket" xml:"websocket,omitempty"`
 	WorkDirSettings struct {
 		Disabled               bool   `json:"disabled" xml:"disabled"`
@@ -307,8 +309,8 @@ func (s *NodesService) List(ctx context.Context) ([]Node, *http.Response, error)
 
 	for i, node := range listResp.Computer {
 		nodes[i] = Node{
-			Name:            node.DisplayName,
-			NodeDescription: node.Description,
+			Name:        node.DisplayName,
+			Description: node.Description,
 		}
 	}
 
@@ -341,4 +343,13 @@ func (s *NodesService) Get(ctx context.Context, name string) (*Node, *http.Respo
 	}
 
 	return &node, nil, nil
+}
+
+func (s *NodesService) Update(ctx context.Context, node *Node) (*Node, *http.Response, error) {
+	resp, err := s.client.post(ctx, fmt.Sprintf(NodesGetURL, node.Name), node)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return node, nil, nil
 }

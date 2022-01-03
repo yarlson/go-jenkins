@@ -8,6 +8,7 @@ package jenkins
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -257,6 +258,45 @@ func (c *Client) postForm(ctx context.Context, query string, body interface{}) (
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+
+	if resp.StatusCode > 299 {
+		return resp, fmt.Errorf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
+	if c.httpClient.Jar != nil {
+		for _, cookie := range resp.Cookies() {
+			c.httpClient.Jar.SetCookies(req.URL, []*http.Cookie{cookie})
+		}
+	}
+
+	return resp, nil
+}
+
+func (c *Client) post(ctx context.Context, query string, body interface{}) (*http.Response, error) {
+	crumbsResp, err := c.setCrumbs(ctx)
+	if err != nil {
+		return crumbsResp, err
+	}
+
+	j, err := xml.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyR := strings.NewReader(string(j))
+	req, _ := c.newRequest(ctx, "POST", query, bodyR)
+	req.Header.Set("Content-Type", "application/xml")
+
+	if c.Crumbs != nil {
+		req.Header.Add(c.Crumbs.RequestField, c.Crumbs.Value)
+		// Crumbs are only valid for one request.
+		c.Crumbs = nil
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return resp, err
+	}
 
 	if resp.StatusCode > 299 {
 		return resp, fmt.Errorf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))

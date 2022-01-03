@@ -316,3 +316,28 @@ func (s *Suite) TestClientPostFormStatusError() {
 	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.Error(err)
 }
+
+func (s *Suite) TestClientPost() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "POST")
+		_, err := w.Write([]byte(
+			`{"A":"a"}`,
+		))
+		s.NoErrorf(err, "w.Write returned %v")
+		s.Equal("Basic YWRtaW46YWRtaW4=", r.Header.Get("Authorization"))
+	})
+
+	got, err := client.post(context.Background(), "test", nil)
+	s.NoError(err)
+	s.Equal(http.StatusOK, got.StatusCode)
+
+	all, err := io.ReadAll(got.Body)
+	s.NoError(err)
+	s.Equal(`{"A":"a"}`, string(all))
+}

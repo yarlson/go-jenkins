@@ -11,7 +11,7 @@ func (s *Suite) TestNodeFillInNodeDefaults() {
 	n.fillInNodeDefaults()
 
 	s.Equal(DefaultJNLPLauncher(), n.Launcher)
-	s.Equal(DefaultNodeProperties(), n.NodeProperties)
+	s.Equal(DefaultNodeProperties(), n.Properties)
 	s.Equal(DefaultNodeType(), n.Type)
 	s.Equal(1, n.NumExecutors)
 	s.Equal(DefaultRetentionsStrategy(), n.RetentionsStrategy)
@@ -163,6 +163,44 @@ func (s *Suite) TestNodesServiceGetUnmarshalError() {
 	})
 
 	_, _, err = client.Nodes.Get(context.Background(), "test")
+
+	s.Error(err)
+}
+
+func (s *Suite) TestNodesServiceUpdate() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "POST")
+	})
+
+	_, _, err = client.Nodes.Update(context.Background(), &Node{
+		Name:        "test",
+		Description: "",
+		RemoteFS:    "/var/lib/jenkins",
+		Mode:        NodeModeExclusive,
+		Labels:      []string{"test"},
+	})
+
+	s.NoError(err)
+}
+
+func (s *Suite) TestNodesServiceUpdateError() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	_, _, err = client.Nodes.Update(context.Background(), &Node{
+		Name:        "test",
+		Description: "",
+		RemoteFS:    "/var/lib/jenkins",
+		Mode:        NodeModeExclusive,
+		Labels:      []string{"test"},
+	})
 
 	s.Error(err)
 }
