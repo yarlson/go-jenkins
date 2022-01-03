@@ -109,9 +109,6 @@ func (s *Suite) testMethod(r *http.Request, want string) {
 
 func (s *Suite) TestClientGet() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
-	s.NoError(err)
-
 	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "GET")
 		_, err := w.Write([]byte(
@@ -120,6 +117,9 @@ func (s *Suite) TestClientGet() {
 		s.NoErrorf(err, "w.Write returned %v")
 		s.Equal("Basic YWRtaW46YWRtaW4=", r.Header.Get("Authorization"))
 	})
+
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
 
 	got, err := client.get(context.Background(), "test")
 	s.NoError(err)
@@ -132,6 +132,7 @@ func (s *Suite) TestClientGet() {
 
 func (s *Suite) TestClientGetNotFound() {
 	s.newMux()
+
 	client, err := NewClient(WithBaseURL(s.server.URL))
 	s.NoError(err)
 
@@ -162,13 +163,13 @@ func (s *Suite) TestClientGetErrorResponse() {
 
 func (s *Suite) TestClientGetCookie() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
-	s.NoError(err)
-
 	s.mux.HandleFunc("/test_cookie", func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "GET")
 		w.Header().Set("Set-Cookie", "test=cookie")
 	})
+
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
 
 	got, err := client.get(context.Background(), "test_cookie")
 	s.NoError(err)
@@ -214,9 +215,6 @@ func (s *Suite) TestClientNewFormRequestError() {
 
 func (s *Suite) TestClientSetCrumbs() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
-	s.NoError(err)
-
 	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "GET")
 		_, err := w.Write([]byte(
@@ -224,6 +222,9 @@ func (s *Suite) TestClientSetCrumbs() {
 		))
 		s.NoError(err)
 	})
+
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
 
 	got, err := client.setCrumbs(context.Background())
 	s.NoError(err)
@@ -246,9 +247,6 @@ func (s *Suite) TestClientSetCrumbsErrorGet() {
 
 func (s *Suite) TestClientSetCrumbsErrorUnmarshal() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
-	s.NoError(err)
-
 	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "GET")
 		_, err := w.Write([]byte(
@@ -257,21 +255,16 @@ func (s *Suite) TestClientSetCrumbsErrorUnmarshal() {
 		s.NoError(err)
 	})
 
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
 	_, err = client.setCrumbs(context.Background())
 	s.Error(err)
 }
 
 func (s *Suite) TestClientPostForm() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL))
-	s.NoError(err)
-
-	type PostBody struct {
-		A string `json:"a"`
-	}
-
 	s.addCrumbsHandle()
-
 	s.mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "POST")
 		_, err := w.Write([]byte(
@@ -280,12 +273,19 @@ func (s *Suite) TestClientPostForm() {
 		s.NoError(err)
 	})
 
+	client, err := NewClient(WithBaseURL(s.server.URL))
+	s.NoError(err)
+
+	type PostBody struct {
+		A string `json:"a"`
+	}
 	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.NoError(err)
 }
 
 func (s *Suite) TestClientPostFormCrumbError() {
 	s.newMux()
+
 	client, err := NewClient(WithBaseURL(s.server.URL))
 	s.NoError(err)
 
@@ -299,20 +299,19 @@ func (s *Suite) TestClientPostFormCrumbError() {
 
 func (s *Suite) TestClientPostFormStatusError() {
 	s.newMux()
+	s.addCrumbsHandle()
+	s.mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte("500 - Something bad happened!"))
+		s.NoError(err)
+	})
+
 	client, err := NewClient(WithBaseURL(s.server.URL))
 	s.NoError(err)
 
 	type PostBody struct {
 		A string `json:"a"`
 	}
-
-	s.addCrumbsHandle()
-
-	s.mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("500 - Something bad happened!"))
-		s.NoError(err)
-	})
 	_, err = client.postForm(context.Background(), "post", &PostBody{A: "B"})
 	s.Error(err)
 }
