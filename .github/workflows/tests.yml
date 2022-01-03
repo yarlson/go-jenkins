@@ -1,10 +1,4 @@
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+on: [ push, pull_request ]
 
 name: tests
 env:
@@ -65,18 +59,6 @@ jobs:
         # don't actually run tests since they hit live GitHub API
         run: go test -v -tags=integration -run=^$ ./test/integration
 
-      - name: Run scrape tests
-        run: |
-          cd scrape
-          go test ./...
-
       - name: Upload coverage to Codecov
         if: ${{ matrix.update-coverage }}
         uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b #v2.1.0
-
-      - name: Ensure go generate produces a zero diff for update-urls
-        shell: bash
-        run: cd update-urls && go generate -x ./... && git diff --exit-code; code=$?; git checkout -- .; (exit $code)
-
-      - name: Run go test for update-urls
-        run: cd update-urls && go test -v -race ./...
