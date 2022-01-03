@@ -26,8 +26,10 @@ const (
 
 	// NodesCreateURL is the URL to create a new node
 	NodesCreateURL = "/computer/doCreateItem"
-	NodesListURL   = "/computer/api/json"
-	NodesGetURL    = "/computer/%s/config.xml"
+	// NodesListURL is the URL to list all nodes
+	NodesListURL = "/computer/api/json"
+	// NodesGetURL is the URL to get a node
+	NodesGetURL = "/computer/%s/config.xml"
 )
 
 // Labels represents Jenkins node labels.
@@ -56,6 +58,9 @@ type Node struct {
 	Launcher           interface{}         `json:"launcher" xml:"launcher"`
 }
 
+// UnmarshalXML implements the xml.Unmarshaler interface.
+// It decodes the XML attributes into the corresponding struct fields.
+// It also decodes the XML child Launcher nodes into the corresponding struct fields.
 func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	type Alias Node // avoids recursive unmarshal
 	v := &struct {
@@ -87,10 +92,12 @@ func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	return nil
 }
 
+// Launcher is the interface for all Jenkins node launchers.
 type Launcher struct {
 	Class string `xml:"launcherType"`
 }
 
+// fillInNodeDefaults fills in default values for the node.
 func (n *Node) fillInNodeDefaults() {
 	if n.Launcher == nil {
 		n.Launcher = DefaultJNLPLauncher()
@@ -168,6 +175,7 @@ type NodeRequest struct {
 	JSON string   `json:"json"`
 }
 
+// NodesListResponse represents a Jenkins node list response.
 type NodesListResponse struct {
 	Class          string     `json:"_class"`
 	BusyExecutors  int        `json:"busyExecutors"`
@@ -176,13 +184,16 @@ type NodesListResponse struct {
 	TotalExecutors int        `json:"totalExecutors"`
 }
 
+// AssignedLabels represents a Jenkins assigned labels.
 type AssignedLabels struct {
 	Name string `json:"name"`
 }
 
+// Executors represents a Jenkins executors.
 type Executors struct {
 }
 
+// LoadStatistics represents a Jenkins load statistics.
 type LoadStatistics struct {
 	Class string `json:"_class"`
 }
@@ -235,6 +246,7 @@ type MonitorData struct {
 	ClockMonitor          ClockMonitor          `json:"hudson.node_monitors.ClockMonitor"`
 }
 
+// Computer represents a Jenkins node/agent.
 type Computer struct {
 	Class               string           `json:"_class"`
 	Actions             []interface{}    `json:"actions"`
@@ -259,6 +271,7 @@ type Computer struct {
 	AbsoluteRemotePath  interface{}      `json:"absoluteRemotePath,omitempty"`
 }
 
+// NodesService handles communication with the node related methods of the Jenkins API
 type NodesService service
 
 // Create creates a new Jenkins node.
@@ -284,6 +297,7 @@ func (s *NodesService) Create(ctx context.Context, node *Node) (*Node, *http.Res
 	return node, resp, nil
 }
 
+// List returns a list of Jenkins nodes.
 func (s *NodesService) List(ctx context.Context) ([]Node, *http.Response, error) {
 	resp, err := s.client.get(ctx, NodesListURL)
 	if err != nil {
@@ -317,6 +331,7 @@ func (s *NodesService) List(ctx context.Context) ([]Node, *http.Response, error)
 	return nodes, nil, nil
 }
 
+// Get returns a Jenkins node.
 func (s *NodesService) Get(ctx context.Context, name string) (*Node, *http.Response, error) {
 	resp, err := s.client.get(ctx, fmt.Sprintf(NodesGetURL, name))
 	if err != nil {
@@ -345,6 +360,7 @@ func (s *NodesService) Get(ctx context.Context, name string) (*Node, *http.Respo
 	return &node, nil, nil
 }
 
+// Update updates a Jenkins node.
 func (s *NodesService) Update(ctx context.Context, node *Node) (*Node, *http.Response, error) {
 	resp, err := s.client.post(ctx, fmt.Sprintf(NodesGetURL, node.Name), node)
 	if err != nil {
