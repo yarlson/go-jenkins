@@ -7,13 +7,14 @@ package jenkins
 
 import (
 	"context"
-	"github.com/stretchr/testify/suite"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {
@@ -99,6 +100,7 @@ func (s *Suite) TestClientNewRequestError() {
 	s.NoError(err)
 
 	//lint:ignore SA1012 this is a test
+	//nolint
 	_, err = client.newRequest(nil, "GET", "/", nil)
 	s.Error(err)
 }
@@ -146,6 +148,7 @@ func (s *Suite) TestClientGetErrorContext() {
 	s.NoError(err)
 
 	//lint:ignore SA1012 this is a test
+	//nolint
 	_, err = client.get(nil, "test_error")
 	s.Error(err)
 }
@@ -209,6 +212,7 @@ func (s *Suite) TestClientNewFormRequestError() {
 
 	values := make(url.Values)
 	//lint:ignore SA1012 this is a test
+	//nolint
 	_, err = client.newFormRequest(nil, "/", values)
 	s.Error(err)
 }
@@ -241,6 +245,7 @@ func (s *Suite) TestClientSetCrumbsErrorGet() {
 	s.mux.HandleFunc(crumbURL, func(w http.ResponseWriter, r *http.Request) {})
 
 	//lint:ignore SA1012 this is a test
+	//nolint
 	_, err = client.setCrumbs(nil)
 	s.Error(err)
 }

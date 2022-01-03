@@ -105,7 +105,7 @@ func WithToken(userName, apiToken string) ClientOption {
 	}
 }
 
-func DefaultHttpClient() *http.Client {
+func DefaultHTTPClient() *http.Client {
 	jar, _ := cookiejar.New(nil)
 	return &http.Client{Jar: jar}
 }
@@ -120,7 +120,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 
 	if c.httpClient == nil {
-		c.httpClient = DefaultHttpClient()
+		c.httpClient = DefaultHTTPClient()
 	}
 
 	if c.apiToken != "" {
