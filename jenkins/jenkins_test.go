@@ -7,6 +7,8 @@ package jenkins
 
 import (
 	"context"
+	"encoding/xml"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -86,6 +88,11 @@ func (s *Suite) TestNewClientWithTokenAndPassword() {
 	s.Error(err)
 }
 
+func (s *Suite) TestNewClientWithPasswordAndToken() {
+	_, err := NewClient(WithPassword("test", "test"), WithToken("test", "test"))
+	s.Error(err)
+}
+
 func (s *Suite) TestClientNewRequest() {
 	client, err := NewClient()
 	s.NoError(err)
@@ -130,6 +137,20 @@ func (s *Suite) TestClientGet() {
 	all, err := io.ReadAll(got.Body)
 	s.NoError(err)
 	s.Equal(string(all), `{"A":"a"}`)
+}
+
+func (s *Suite) TestClientGetDoError() {
+	s.newMux()
+	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		// Sends zero body with wrong content-length
+		w.Header().Set("Content-Length", "1")
+	})
+
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	_, err = client.get(context.Background(), "test")
+	s.NoError(err)
 }
 
 func (s *Suite) TestClientGetNotFound() {
@@ -331,7 +352,7 @@ func (s *Suite) TestClientPost() {
 	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "POST")
 		_, err := w.Write([]byte(
-			`{"A":"a"}`,
+			`<root></root>`,
 		))
 		s.NoErrorf(err, "w.Write returned %v")
 		s.Equal("Basic YWRtaW46YWRtaW4=", r.Header.Get("Authorization"))
@@ -343,5 +364,39 @@ func (s *Suite) TestClientPost() {
 
 	all, err := io.ReadAll(got.Body)
 	s.NoError(err)
-	s.Equal(`{"A":"a"}`, string(all))
+	s.Equal(`<root></root>`, string(all))
+}
+
+type brokenXML struct{}
+
+func (b *brokenXML) MarshalXML(e *xml.Encoder, start xml.StartElement) (err error) {
+	return errors.New("")
+}
+
+func (s *Suite) TestClientPostWrongBody() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
+
+	_, err = client.post(context.Background(), "test", &brokenXML{})
+	s.Error(err)
+}
+
+func (s *Suite) TestClientPostNotOK() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "my own error message", http.StatusBadRequest)
+	})
+
+	_, err = client.post(context.Background(), "test", nil)
+	s.Error(err)
 }
