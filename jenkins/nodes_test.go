@@ -152,8 +152,7 @@ func (s *Suite) TestNodesServiceGetUnmarshalError() {
 	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
 		s.testMethod(r, "GET")
 		_, err := w.Write([]byte(
-			`
-<?xml version="2.0" encoding="UTF-8"?>
+			`<?xml version="2.0" encoding="UTF-8"?>
 <slave>
 
 </slave>

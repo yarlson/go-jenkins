@@ -20,7 +20,8 @@ import (
 
 const (
 	// crumbURL is the URL to issue a crumb request.
-	crumbURL       = "/crumbIssuer/api/json"
+	crumbURL = "/crumbIssuer/api/json"
+	// defaultBaseURL is the default base URL for Jenkins.
 	defaultBaseURL = "http://127.0.0.1:8080"
 )
 
@@ -59,12 +60,15 @@ type Client struct {
 	Nodes *NodesService
 }
 
+// service represents a Jenkins service.
 type service struct {
 	client *Client
 }
 
+// ClientOption represents an option for the Jenkins client.
 type ClientOption func(*Client) error
 
+// WithClient sets the http client for the Jenkins client.
 func WithClient(client *http.Client) ClientOption {
 	return func(c *Client) error {
 		c.httpClient = client
@@ -73,6 +77,7 @@ func WithClient(client *http.Client) ClientOption {
 	}
 }
 
+// WithBaseURL sets the base URL for the Jenkins client.
 func WithBaseURL(baseURL string) ClientOption {
 	return func(c *Client) error {
 		c.baseURL = baseURL
@@ -81,6 +86,7 @@ func WithBaseURL(baseURL string) ClientOption {
 	}
 }
 
+// WithPassword sets the password for the Jenkins client.
 func WithPassword(userName, password string) ClientOption {
 	return func(c *Client) error {
 		if c.apiToken != "" {
@@ -93,6 +99,7 @@ func WithPassword(userName, password string) ClientOption {
 	}
 }
 
+// WithToken sets the API token for the Jenkins client.
 func WithToken(userName, apiToken string) ClientOption {
 	return func(c *Client) error {
 		if c.password != "" {
@@ -105,6 +112,7 @@ func WithToken(userName, apiToken string) ClientOption {
 	}
 }
 
+// DefaultHTTPClient returns a default http client.
 func DefaultHTTPClient() *http.Client {
 	jar, _ := cookiejar.New(nil)
 	return &http.Client{Jar: jar}
@@ -239,7 +247,7 @@ func convertBodyStruct(body interface{}) url.Values {
 	return values
 }
 
-// postForm issues a POST to the specified path with the given form data.
+// postForm issues form data to the specified path with the given parameters.
 func (c *Client) postForm(ctx context.Context, query string, body interface{}) (*http.Response, error) {
 	crumbsResp, err := c.setCrumbs(ctx)
 	if err != nil {
@@ -272,6 +280,7 @@ func (c *Client) postForm(ctx context.Context, query string, body interface{}) (
 	return resp, nil
 }
 
+// post issues a POST to the specified path with the given body.
 func (c *Client) post(ctx context.Context, query string, body interface{}) (*http.Response, error) {
 	crumbsResp, err := c.setCrumbs(ctx)
 	if err != nil {

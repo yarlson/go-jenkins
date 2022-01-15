@@ -32,16 +32,6 @@ const (
 	NodesGetURL = "/computer/%s/config.xml"
 )
 
-// Labels represents Jenkins node labels.
-type Labels []string
-
-// MarshalJSON implements the json.Marshaler interface.
-// Concatenates all labels with a space.
-func (l Labels) MarshalJSON() ([]byte, error) {
-	labels := fmt.Sprintf(`"%s"`, strings.Join(l, " "))
-	return []byte(labels), nil
-}
-
 // Node represents a Jenkins node.
 type Node struct {
 	XMLName xml.Name `xml:"slave"`
@@ -56,6 +46,29 @@ type Node struct {
 	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy" xml:"retentionsStrategy"`
 	Properties         *NodeProperties     `json:"nodeProperties" xml:"nodeProperties"`
 	Launcher           interface{}         `json:"launcher" xml:"launcher"`
+}
+
+// fillInNodeDefaults fills in default values for the node.
+func (n *Node) fillInNodeDefaults() {
+	if n.Launcher == nil {
+		n.Launcher = DefaultJNLPLauncher()
+	}
+
+	if n.Properties == nil {
+		n.Properties = DefaultNodeProperties()
+	}
+
+	if n.Type == "" {
+		n.Type = DefaultNodeType()
+	}
+
+	if n.NumExecutors == 0 {
+		n.NumExecutors = 1
+	}
+
+	if n.RetentionsStrategy == nil {
+		n.RetentionsStrategy = DefaultRetentionsStrategy()
+	}
 }
 
 // UnmarshalXML implements the xml.Unmarshaler interface.
@@ -92,32 +105,14 @@ func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	return nil
 }
 
-// Launcher is the interface for all Jenkins node launchers.
-type Launcher struct {
-	Class string `xml:"launcherType"`
-}
+// Labels represents Jenkins node labels.
+type Labels []string
 
-// fillInNodeDefaults fills in default values for the node.
-func (n *Node) fillInNodeDefaults() {
-	if n.Launcher == nil {
-		n.Launcher = DefaultJNLPLauncher()
-	}
-
-	if n.Properties == nil {
-		n.Properties = DefaultNodeProperties()
-	}
-
-	if n.Type == "" {
-		n.Type = DefaultNodeType()
-	}
-
-	if n.NumExecutors == 0 {
-		n.NumExecutors = 1
-	}
-
-	if n.RetentionsStrategy == nil {
-		n.RetentionsStrategy = DefaultRetentionsStrategy()
-	}
+// MarshalJSON implements the json.Marshaler interface.
+// Concatenates all labels with a space.
+func (l Labels) MarshalJSON() ([]byte, error) {
+	labels := fmt.Sprintf(`"%s"`, strings.Join(l, " "))
+	return []byte(labels), nil
 }
 
 // RetentionsStrategy represents a Jenkins node retention strategy.
@@ -135,6 +130,13 @@ type NodeProperties struct {
 	StaplerClassBag string `json:"stapler-class-bag"`
 }
 
+// DefaultNodeProperties returns the default node properties.
+func DefaultNodeProperties() *NodeProperties {
+	return &NodeProperties{
+		StaplerClassBag: "true",
+	}
+}
+
 // NodeType represents a Jenkins node type.
 type NodeType string
 
@@ -143,11 +145,9 @@ func DefaultNodeType() NodeType {
 	return "hudson.slaves.DumbSlave$DescriptorImpl"
 }
 
-// DefaultNodeProperties returns the default node properties.
-func DefaultNodeProperties() *NodeProperties {
-	return &NodeProperties{
-		StaplerClassBag: "true",
-	}
+// Launcher is the interface for all Jenkins node launchers.
+type Launcher struct {
+	Class string `xml:"launcherType"`
 }
 
 // JNLPLauncher represents a Jenkins JNLP launcher.
@@ -184,6 +184,31 @@ type NodesListResponse struct {
 	TotalExecutors int        `json:"totalExecutors"`
 }
 
+// Computer represents a Jenkins node/agent.
+type Computer struct {
+	Class               string           `json:"_class"`
+	Actions             []interface{}    `json:"actions"`
+	AssignedLabels      []AssignedLabels `json:"assignedLabels"`
+	Description         string           `json:"description"`
+	DisplayName         string           `json:"displayName"`
+	Executors           []Executors      `json:"executors"`
+	Icon                string           `json:"icon"`
+	IconClassName       string           `json:"iconClassName"`
+	Idle                bool             `json:"idle"`
+	JnlpAgent           bool             `json:"jnlpAgent"`
+	LaunchSupported     bool             `json:"launchSupported"`
+	LoadStatistics      LoadStatistics   `json:"loadStatistics"`
+	ManualLaunchAllowed bool             `json:"manualLaunchAllowed"`
+	MonitorData         MonitorData      `json:"monitorData"`
+	NumExecutors        int              `json:"numExecutors"`
+	Offline             bool             `json:"offline"`
+	OfflineCause        interface{}      `json:"offlineCause"`
+	OfflineCauseReason  string           `json:"offlineCauseReason"`
+	OneOffExecutors     []interface{}    `json:"oneOffExecutors"`
+	TemporarilyOffline  bool             `json:"temporarilyOffline"`
+	AbsoluteRemotePath  interface{}      `json:"absoluteRemotePath,omitempty"`
+}
+
 // AssignedLabels represents a Jenkins assigned labels.
 type AssignedLabels struct {
 	Name string `json:"name"`
@@ -196,6 +221,16 @@ type Executors struct {
 // LoadStatistics represents a Jenkins load statistics.
 type LoadStatistics struct {
 	Class string `json:"_class"`
+}
+
+// MonitorData expose monitoring data
+type MonitorData struct {
+	SwapSpaceMonitor      SwapSpaceMonitor      `json:"hudson.node_monitors.SwapSpaceMonitor"`
+	TemporarySpaceMonitor TemporarySpaceMonitor `json:"hudson.node_monitors.TemporarySpaceMonitor"`
+	DiskSpaceMonitor      DiskSpaceMonitor      `json:"hudson.node_monitors.DiskSpaceMonitor"`
+	ArchitectureMonitor   string                `json:"hudson.node_monitors.ArchitectureMonitor"`
+	ResponseTimeMonitor   ResponseTimeMonitor   `json:"hudson.node_monitors.ResponseTimeMonitor"`
+	ClockMonitor          ClockMonitor          `json:"hudson.node_monitors.ClockMonitor"`
 }
 
 // SwapSpaceMonitor checks the swap space availability.
@@ -234,41 +269,6 @@ type ResponseTimeMonitor struct {
 type ClockMonitor struct {
 	Class string `json:"_class"`
 	Diff  int    `json:"diff"`
-}
-
-// MonitorData expose monitoring data
-type MonitorData struct {
-	SwapSpaceMonitor      SwapSpaceMonitor      `json:"hudson.node_monitors.SwapSpaceMonitor"`
-	TemporarySpaceMonitor TemporarySpaceMonitor `json:"hudson.node_monitors.TemporarySpaceMonitor"`
-	DiskSpaceMonitor      DiskSpaceMonitor      `json:"hudson.node_monitors.DiskSpaceMonitor"`
-	ArchitectureMonitor   string                `json:"hudson.node_monitors.ArchitectureMonitor"`
-	ResponseTimeMonitor   ResponseTimeMonitor   `json:"hudson.node_monitors.ResponseTimeMonitor"`
-	ClockMonitor          ClockMonitor          `json:"hudson.node_monitors.ClockMonitor"`
-}
-
-// Computer represents a Jenkins node/agent.
-type Computer struct {
-	Class               string           `json:"_class"`
-	Actions             []interface{}    `json:"actions"`
-	AssignedLabels      []AssignedLabels `json:"assignedLabels"`
-	Description         string           `json:"description"`
-	DisplayName         string           `json:"displayName"`
-	Executors           []Executors      `json:"executors"`
-	Icon                string           `json:"icon"`
-	IconClassName       string           `json:"iconClassName"`
-	Idle                bool             `json:"idle"`
-	JnlpAgent           bool             `json:"jnlpAgent"`
-	LaunchSupported     bool             `json:"launchSupported"`
-	LoadStatistics      LoadStatistics   `json:"loadStatistics"`
-	ManualLaunchAllowed bool             `json:"manualLaunchAllowed"`
-	MonitorData         MonitorData      `json:"monitorData"`
-	NumExecutors        int              `json:"numExecutors"`
-	Offline             bool             `json:"offline"`
-	OfflineCause        interface{}      `json:"offlineCause"`
-	OfflineCauseReason  string           `json:"offlineCauseReason"`
-	OneOffExecutors     []interface{}    `json:"oneOffExecutors"`
-	TemporarilyOffline  bool             `json:"temporarilyOffline"`
-	AbsoluteRemotePath  interface{}      `json:"absoluteRemotePath,omitempty"`
 }
 
 // NodesService handles communication with the node related methods of the Jenkins API
