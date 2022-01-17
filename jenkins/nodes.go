@@ -34,7 +34,7 @@ const (
 
 // Node represents a Jenkins node.
 type Node struct {
-	XMLName xml.Name `xml:"slave"`
+	XMLName xml.Name `xml:"slave" json:"-"`
 
 	Name               string              `json:"name" xml:"name"`
 	Description        string              `json:"nodeDescription" xml:"description"`
@@ -45,7 +45,7 @@ type Node struct {
 	Labels             Labels              `json:"labelString" xml:"label"`
 	RetentionsStrategy *RetentionsStrategy `json:"retentionsStrategy" xml:"retentionsStrategy"`
 	Properties         *NodeProperties     `json:"nodeProperties" xml:"nodeProperties"`
-	Launcher           interface{}         `json:"launcher" xml:"launcher"`
+	Launcher           Launcher            `json:"launcher" xml:"launcher"`
 }
 
 // fillInNodeDefaults fills in default values for the node.
@@ -100,6 +100,12 @@ func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		if err != nil {
 			return err
 		}
+	case "hudson.slaves.SSHLauncher":
+		n.Launcher = &SSHLauncher{}
+		err := xml.Unmarshal(launcherXML, n.Launcher)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -143,29 +149,6 @@ type NodeType string
 // DefaultNodeType represents the default Jenkins node type.
 func DefaultNodeType() NodeType {
 	return "hudson.slaves.DumbSlave$DescriptorImpl"
-}
-
-// Launcher is the interface for all Jenkins node launchers.
-type Launcher struct {
-	Class string `xml:"launcherType"`
-}
-
-// JNLPLauncher represents a Jenkins JNLP launcher.
-type JNLPLauncher struct {
-	StaplerClass    string `json:"stapler-class" xml:"class,attr"`
-	WebSocket       bool   `json:"websocket" xml:"websocket,omitempty"`
-	WorkDirSettings struct {
-		Disabled               bool   `json:"disabled" xml:"disabled"`
-		InternalDir            string `json:"internalDir" xml:"internalDir"`
-		FailIfWorkDirIsMissing bool   `json:"failIfWorkDirIsMissing" xml:"failIfWorkDirIsMissing"`
-	} `json:"workDirSettings,omitempty" xml:"workDirSettings,omitempty"`
-}
-
-// DefaultJNLPLauncher returns the default JNLP launcher.
-func DefaultJNLPLauncher() *JNLPLauncher {
-	return &JNLPLauncher{
-		StaplerClass: "hudson.slaves.JNLPLauncher",
-	}
 }
 
 // NodeRequest represents a Jenkins node request.

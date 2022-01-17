@@ -44,19 +44,54 @@ func (s *Suite) TestNodesCreate() {
 	}
 
 	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.Create(context.Background(), node)
-	s.NoError(err)
+	s.Require().NoError(err)
+	s.Equal(name, got.Name)
+}
+
+func (s *Suite) TestNodesCreateSSHLauncher() {
+	randBytes := make([]byte, 16)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(randBytes)
+	name := hex.EncodeToString(randBytes)
+
+	node := &jenkins.Node{
+		Name:               name,
+		Description:        "",
+		RemoteFS:           "/var/lib/jenkins",
+		NumExecutors:       1,
+		Mode:               jenkins.NodeModeExclusive,
+		Type:               "hudson.slaves.DumbSlave$DescriptorImpl",
+		Labels:             []string{"test"},
+		RetentionsStrategy: jenkins.DefaultRetentionsStrategy(),
+		Launcher: jenkins.NewSSHLauncher(
+			"localhost",
+			22,
+			"jenkins",
+			10,
+			15,
+			10,
+			true,
+			jenkins.NewNonVerifyingKeyVerificationStrategy(),
+		),
+	}
+
+	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	s.Require().NoError(err)
+
+	got, _, err := client.Nodes.Create(context.Background(), node)
+	s.Require().NoError(err)
 	s.Equal(name, got.Name)
 }
 
 func (s *Suite) TestNodesList() {
 	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.List(context.Background())
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Greater(len(got), 0)
 }
 
@@ -78,14 +113,14 @@ func (s *Suite) TestNodesUpdate() {
 	}
 
 	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.Create(context.Background(), node)
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(name, got.Name)
 
 	node.Description = "updated"
 	node, _, err = client.Nodes.Update(context.Background(), node)
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal("updated", node.Description)
 }
