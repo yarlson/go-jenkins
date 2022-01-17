@@ -31,13 +31,15 @@ type Crumbs struct {
 	RequestField string `json:"crumbRequestField"`
 }
 
+// BasicAuthTransport is a http.RoundTripper that authenticates all requests
 type BasicAuthTransport struct {
 	Username string
 	Password string
 }
 
-func (bat BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.SetBasicAuth(bat.Username, bat.Password)
+// RoundTrip implements the RoundTripper interface.
+func (t BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(t.Username, t.Password)
 
 	return http.DefaultTransport.RoundTrip(req)
 }
