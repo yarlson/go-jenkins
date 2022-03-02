@@ -203,3 +203,19 @@ func (s *Suite) TestNodesServiceUpdateError() {
 
 	s.Error(err)
 }
+
+func (s *Suite) TestNodesServiceDelete() {
+	s.newMux()
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
+	s.NoError(err)
+
+	s.addCrumbsHandle()
+
+	s.mux.HandleFunc(fmt.Sprintf(NodesDeleteURL, "test"), func(w http.ResponseWriter, r *http.Request) {
+		s.testMethod(r, "POST")
+	})
+
+	resp, err := client.Nodes.Delete(context.Background(), "test")
+	s.NoError(err)
+	s.NotNil(resp)
+}

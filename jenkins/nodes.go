@@ -30,6 +30,8 @@ const (
 	NodesListURL = "/computer/api/json"
 	// NodesGetURL is the URL to get a node
 	NodesGetURL = "/computer/%s/config.xml"
+	// NodesDeleteURL is the URL to delete a node
+	NodesDeleteURL = "/computer/%s/doDelete"
 )
 
 // Node represents a Jenkins node.
@@ -351,4 +353,9 @@ func (s *NodesService) Update(ctx context.Context, node *Node) (*Node, *http.Res
 	}
 
 	return node, nil, nil
+}
+
+// Delete deletes a Jenkins node.
+func (s *NodesService) Delete(ctx context.Context, name string) (*http.Response, error) {
+	return s.client.post(ctx, fmt.Sprintf(NodesDeleteURL, name), nil)
 }

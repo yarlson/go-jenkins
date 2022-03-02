@@ -124,3 +124,31 @@ func (s *Suite) TestNodesUpdate() {
 	s.Require().NoError(err)
 	s.Equal("updated", node.Description)
 }
+
+func (s *Suite) TestNodesDelete() {
+	randBytes := make([]byte, 16)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(randBytes)
+	name := hex.EncodeToString(randBytes)
+
+	node := &jenkins.Node{
+		Name:               name,
+		Description:        "",
+		RemoteFS:           "/var/lib/jenkins",
+		NumExecutors:       1,
+		Mode:               jenkins.NodeModeExclusive,
+		Type:               "hudson.slaves.DumbSlave$DescriptorImpl",
+		Labels:             []string{"test"},
+		RetentionsStrategy: &jenkins.RetentionsStrategy{StaplerClass: "hudson.slaves.RetentionStrategy$Always"},
+	}
+
+	client, err := jenkins.NewClient(jenkins.WithUserPassword("admin", "admin"))
+	s.Require().NoError(err)
+
+	got, _, err := client.Nodes.Create(context.Background(), node)
+	s.Require().NoError(err)
+	s.Equal(name, got.Name)
+
+	_, err = client.Nodes.Delete(context.Background(), name)
+	s.Require().NoError(err)
+}
