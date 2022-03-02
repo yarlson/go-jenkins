@@ -19,7 +19,7 @@ func (s *Suite) TestNodeFillInNodeDefaults() {
 
 func (s *Suite) TestNodesServiceCreate() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -38,7 +38,7 @@ func (s *Suite) TestNodesServiceCreate() {
 
 func (s *Suite) TestNodesServiceCreateError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -49,7 +49,7 @@ func (s *Suite) TestNodesServiceCreateError() {
 
 func (s *Suite) TestNodesServiceList() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -68,7 +68,7 @@ func (s *Suite) TestNodesServiceList() {
 
 func (s *Suite) TestNodesServiceListError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	//lint:ignore SA1012 this is a test
@@ -78,7 +78,7 @@ func (s *Suite) TestNodesServiceListError() {
 
 func (s *Suite) TestNodesServiceListUnmarshalError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -96,7 +96,7 @@ func (s *Suite) TestNodesServiceListUnmarshalError() {
 
 func (s *Suite) TestNodesServiceGet() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func (s *Suite) TestNodesServiceGet() {
 
 func (s *Suite) TestNodesServiceGetError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	_, _, err = client.Nodes.Get(context.Background(), "test")
@@ -146,7 +146,7 @@ func (s *Suite) TestNodesServiceGetError() {
 
 func (s *Suite) TestNodesServiceGetUnmarshalError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.mux.HandleFunc(fmt.Sprintf(NodesGetURL, "test"), func(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +168,7 @@ func (s *Suite) TestNodesServiceGetUnmarshalError() {
 
 func (s *Suite) TestNodesServiceUpdate() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -190,7 +190,7 @@ func (s *Suite) TestNodesServiceUpdate() {
 
 func (s *Suite) TestNodesServiceUpdateError() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	_, _, err = client.Nodes.Update(context.Background(), &Node{

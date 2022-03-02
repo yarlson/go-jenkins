@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Launcher is the interface for all Jenkins node launchers.
+// Launcher is the interface for  all Jenkins node launchers.
 type Launcher interface{}
 
 // WorkDirSettings represents the Jenkins node work directory settings.

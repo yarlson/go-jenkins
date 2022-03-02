@@ -74,22 +74,22 @@ func (s *Suite) TestNewClientWithClient() {
 }
 
 func (s *Suite) TestNewClientWithPassword() {
-	_, err := NewClient(WithPassword("test", "test"))
+	_, err := NewClient(WithUserPassword("test", "test"))
 	s.NoError(err)
 }
 
 func (s *Suite) TestNewClientWithToken() {
-	_, err := NewClient(WithToken("test", "test"))
+	_, err := NewClient(WithUserToken("test", "test"))
 	s.NoError(err)
 }
 
 func (s *Suite) TestNewClientWithTokenAndPassword() {
-	_, err := NewClient(WithToken("test", "test"), WithPassword("test", "test"))
+	_, err := NewClient(WithUserToken("test", "test"), WithUserPassword("test", "test"))
 	s.Error(err)
 }
 
 func (s *Suite) TestNewClientWithPasswordAndToken() {
-	_, err := NewClient(WithPassword("test", "test"), WithToken("test", "test"))
+	_, err := NewClient(WithUserPassword("test", "test"), WithUserToken("test", "test"))
 	s.Error(err)
 }
 
@@ -127,7 +127,7 @@ func (s *Suite) TestClientGet() {
 		s.Equal("Basic YWRtaW46YWRtaW4=", r.Header.Get("Authorization"))
 	})
 
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	got, err := client.get(context.Background(), "test")
@@ -146,7 +146,7 @@ func (s *Suite) TestClientGetDoError() {
 		w.Header().Set("Content-Length", "1")
 	})
 
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	_, err = client.get(context.Background(), "test")
@@ -192,7 +192,7 @@ func (s *Suite) TestClientGetCookie() {
 		w.Header().Set("Set-Cookie", "test=cookie")
 	})
 
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	got, err := client.get(context.Background(), "test_cookie")
@@ -219,7 +219,7 @@ func (s *Suite) TestClientNewFormRequestWithCrumbs() {
 	client, err := NewClient()
 	s.NoError(err)
 
-	client.Crumbs = &Crumbs{RequestField: "crumbRequestField", Value: "crumb"}
+	client.crumbs = &Crumbs{RequestField: "crumbRequestField", Value: "crumb"}
 
 	values := make(url.Values)
 	got, err := client.newFormRequest(context.Background(), "/", values)
@@ -248,7 +248,7 @@ func (s *Suite) TestClientSetCrumbs() {
 		s.NoError(err)
 	})
 
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	got, err := client.setCrumbs(context.Background())
@@ -281,7 +281,7 @@ func (s *Suite) TestClientSetCrumbsErrorUnmarshal() {
 		s.NoError(err)
 	})
 
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	_, err = client.setCrumbs(context.Background())
@@ -344,7 +344,7 @@ func (s *Suite) TestClientPostFormStatusError() {
 
 func (s *Suite) TestClientPost() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -375,7 +375,7 @@ func (b *brokenXML) MarshalXML(e *xml.Encoder, start xml.StartElement) (err erro
 
 func (s *Suite) TestClientPostWrongBody() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()
@@ -388,7 +388,7 @@ func (s *Suite) TestClientPostWrongBody() {
 
 func (s *Suite) TestClientPostNotOK() {
 	s.newMux()
-	client, err := NewClient(WithBaseURL(s.server.URL), WithPassword("admin", "admin"))
+	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
 	s.addCrumbsHandle()

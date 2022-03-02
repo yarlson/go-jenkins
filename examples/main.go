@@ -9,7 +9,7 @@ import (
 func main() {
 	client, err := jenkins.NewClient(
 		jenkins.WithBaseURL("http://localhost:8080"),
-		jenkins.WithPassword("admin", "admin"),
+		jenkins.WithUserPassword("admin", "admin"),
 	)
 	if err != nil {
 		panic(err)

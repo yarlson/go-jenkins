@@ -43,7 +43,7 @@ func (s *Suite) TestNodesCreate() {
 		RetentionsStrategy: &jenkins.RetentionsStrategy{StaplerClass: "hudson.slaves.RetentionStrategy$Always"},
 	}
 
-	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	client, err := jenkins.NewClient(jenkins.WithUserPassword("admin", "admin"))
 	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.Create(context.Background(), node)
@@ -78,7 +78,7 @@ func (s *Suite) TestNodesCreateSSHLauncher() {
 		),
 	}
 
-	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	client, err := jenkins.NewClient(jenkins.WithUserPassword("admin", "admin"))
 	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.Create(context.Background(), node)
@@ -87,7 +87,7 @@ func (s *Suite) TestNodesCreateSSHLauncher() {
 }
 
 func (s *Suite) TestNodesList() {
-	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	client, err := jenkins.NewClient(jenkins.WithUserPassword("admin", "admin"))
 	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.List(context.Background())
@@ -112,7 +112,7 @@ func (s *Suite) TestNodesUpdate() {
 		RetentionsStrategy: &jenkins.RetentionsStrategy{StaplerClass: "hudson.slaves.RetentionStrategy$Always"},
 	}
 
-	client, err := jenkins.NewClient(jenkins.WithPassword("admin", "admin"))
+	client, err := jenkins.NewClient(jenkins.WithUserPassword("admin", "admin"))
 	s.Require().NoError(err)
 
 	got, _, err := client.Nodes.Create(context.Background(), node)

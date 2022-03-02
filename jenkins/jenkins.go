@@ -50,7 +50,7 @@ type Client struct {
 
 	UserAgent string
 
-	Crumbs *Crumbs
+	crumbs *Crumbs
 
 	common service
 
@@ -88,8 +88,8 @@ func WithBaseURL(baseURL string) ClientOption {
 	}
 }
 
-// WithPassword sets the password for the Jenkins client.
-func WithPassword(userName, password string) ClientOption {
+// WithUserPassword sets the password for the Jenkins client.
+func WithUserPassword(userName, password string) ClientOption {
 	return func(c *Client) error {
 		if c.apiToken != "" {
 			return fmt.Errorf("cannot set both API token and password")
@@ -101,8 +101,8 @@ func WithPassword(userName, password string) ClientOption {
 	}
 }
 
-// WithToken sets the API token for the Jenkins client.
-func WithToken(userName, apiToken string) ClientOption {
+// WithUserToken sets the API token for the Jenkins client.
+func WithUserToken(userName, apiToken string) ClientOption {
 	return func(c *Client) error {
 		if c.password != "" {
 			return fmt.Errorf("cannot set both API token and password")
@@ -169,7 +169,7 @@ func (c *Client) setCrumbs(ctx context.Context) (*http.Response, error) {
 		return resp, err
 	}
 
-	c.Crumbs = crumbs
+	c.crumbs = crumbs
 
 	return resp, nil
 }
@@ -200,10 +200,10 @@ func (c *Client) newFormRequest(ctx context.Context, query string, values url.Va
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	if c.Crumbs != nil {
-		req.Header.Add(c.Crumbs.RequestField, c.Crumbs.Value)
-		// Crumbs are only valid for one request.
-		c.Crumbs = nil
+	if c.crumbs != nil {
+		req.Header.Add(c.crumbs.RequestField, c.crumbs.Value)
+		// crumbs are only valid for one request.
+		c.crumbs = nil
 	}
 	return req, nil
 }
@@ -298,10 +298,10 @@ func (c *Client) post(ctx context.Context, query string, body interface{}) (*htt
 	req, _ := c.newRequest(ctx, "POST", query, bodyR)
 	req.Header.Set("Content-Type", "application/xml")
 
-	if c.Crumbs != nil {
-		req.Header.Add(c.Crumbs.RequestField, c.Crumbs.Value)
-		// Crumbs are only valid for one request.
-		c.Crumbs = nil
+	if c.crumbs != nil {
+		req.Header.Add(c.crumbs.RequestField, c.crumbs.Value)
+		// crumbs are only valid for one request.
+		c.crumbs = nil
 	}
 
 	resp, err := c.httpClient.Do(req)
