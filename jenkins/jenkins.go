@@ -1,8 +1,3 @@
-// Copyright 2021 The go-jenkins AUTHORS. All rights reserved.
-//
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package jenkins
 
 import (
@@ -19,76 +14,62 @@ import (
 )
 
 const (
-	// crumbURL is the URL to issue a crumb request.
-	crumbURL = "/crumbIssuer/api/json"
-	// defaultBaseURL is the default base URL for Jenkins.
-	defaultBaseURL = "http://127.0.0.1:8080"
+	crumbURL        = "/crumbIssuer/api/json"
+	defaultBaseURL  = "http://127.0.0.1:8080"
+	defaultUserName = "admin"
 )
 
-// Crumbs represents Jenkins CSRF Crumbs
 type Crumbs struct {
 	Value        string `json:"crumb"`
 	RequestField string `json:"crumbRequestField"`
 }
 
-// BasicAuthTransport is a http.RoundTripper that authenticates all requests
 type BasicAuthTransport struct {
 	Username string
 	Password string
 }
 
-// RoundTrip implements the RoundTripper interface.
 func (t BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.SetBasicAuth(t.Username, t.Password)
-
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-// A Client manages communication with the Jenkins API.
 type Client struct {
 	httpClient *http.Client
-
-	UserAgent string
-
-	crumbs *Crumbs
+	baseURL    string
+	userName   string
+	password   string
+	apiToken   string
+	userAgent  string
+	crumbs     *Crumbs
 
 	common service
-
-	baseURL  string
-	userName string
-	password string
-	apiToken string
-
-	Nodes *NodesService
+	Nodes  *NodesService
 }
 
-// service represents a Jenkins service.
 type service struct {
 	client *Client
 }
 
-// ClientOption represents an option for the Jenkins client.
 type ClientOption func(*Client) error
 
-// WithClient sets the http client for the Jenkins client.
+// WithClient sets the http client for the Jenkins client
 func WithClient(client *http.Client) ClientOption {
 	return func(c *Client) error {
 		c.httpClient = client
-
 		return nil
 	}
 }
 
-// WithBaseURL sets the base URL for the Jenkins client.
+// WithBaseURL sets the base URL for the Jenkins client
 func WithBaseURL(baseURL string) ClientOption {
 	return func(c *Client) error {
 		c.baseURL = baseURL
-
 		return nil
 	}
 }
 
-// WithUserPassword sets the password for the Jenkins client.
+// WithUserPassword sets the password for the Jenkins client
 func WithUserPassword(userName, password string) ClientOption {
 	return func(c *Client) error {
 		if c.apiToken != "" {
@@ -96,12 +77,11 @@ func WithUserPassword(userName, password string) ClientOption {
 		}
 		c.userName = userName
 		c.password = password
-
 		return nil
 	}
 }
 
-// WithUserToken sets the API token for the Jenkins client.
+// WithUserToken sets the API token for the Jenkins client
 func WithUserToken(userName, apiToken string) ClientOption {
 	return func(c *Client) error {
 		if c.password != "" {
@@ -109,20 +89,17 @@ func WithUserToken(userName, apiToken string) ClientOption {
 		}
 		c.userName = userName
 		c.apiToken = apiToken
-
 		return nil
 	}
 }
 
-// DefaultHTTPClient returns a default http client.
-func DefaultHTTPClient() *http.Client {
-	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar}
-}
-
-// NewClient returns a new Jenkins API client.
+// NewClient returns a new Jenkins API client
 func NewClient(opts ...ClientOption) (*Client, error) {
-	c := &Client{baseURL: defaultBaseURL}
+	c := &Client{
+		baseURL:  defaultBaseURL,
+		userName: defaultUserName,
+	}
+
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
 			return nil, err
@@ -130,15 +107,18 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 
 	if c.httpClient == nil {
-		c.httpClient = DefaultHTTPClient()
+		jar, _ := cookiejar.New(nil)
+		c.httpClient = &http.Client{Jar: jar}
 	}
 
-	if c.apiToken != "" {
-		c.httpClient.Transport = BasicAuthTransport{Username: c.userName, Password: c.apiToken}
-	}
-
-	if c.password != "" {
-		c.httpClient.Transport = BasicAuthTransport{Username: c.userName, Password: c.password}
+	if c.apiToken != "" || c.password != "" {
+		c.httpClient.Transport = &BasicAuthTransport{
+			Username: c.userName,
+			Password: c.apiToken,
+		}
+		if c.password != "" {
+			c.httpClient.Transport.(*BasicAuthTransport).Password = c.password
+		}
 	}
 
 	c.common.client = c
@@ -147,53 +127,42 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	return c, nil
 }
 
-// setCrumbs sets the Crumbs for the client.
-func (c *Client) setCrumbs(ctx context.Context) (*http.Response, error) {
+func (c *Client) setCrumbs(ctx context.Context) error {
 	resp, err := c.get(ctx, crumbURL)
 	if err != nil {
-		return resp, err
+		return err
+	}
+	defer resp.Body.Close()
+
+	var crumbs Crumbs
+	if err := json.NewDecoder(resp.Body).Decode(&crumbs); err != nil {
+		return err
 	}
 
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp, err
-	}
-
-	crumbs := &Crumbs{}
-	err = json.Unmarshal(body, crumbs)
-	if err != nil {
-		return resp, err
-	}
-
-	c.crumbs = crumbs
-
-	return resp, nil
+	c.crumbs = &crumbs
+	return nil
 }
 
-// newRequest creates an API request. A relative URL can be provided in query,
-func (c *Client) newRequest(ctx context.Context, method string, query string, body io.Reader) (*http.Request, error) {
-	query = "/" + strings.TrimPrefix(query, "/")
-	req, err := http.NewRequestWithContext(
-		ctx,
-		method,
-		fmt.Sprintf("%s%s", c.baseURL, query),
-		body,
-	)
+func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+	u, err := url.JoinPath(c.baseURL, path)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
 	}
 
 	return req, nil
 }
 
-// newFormRequest creates an API request with form data.
-func (c *Client) newFormRequest(ctx context.Context, query string, values url.Values) (*http.Request, error) {
-	body := strings.NewReader(values.Encode())
-	req, err := c.newRequest(ctx, "POST", query, body)
+func (c *Client) newFormRequest(ctx context.Context, path string, values url.Values) (*http.Request, error) {
+	req, err := c.newRequest(ctx, http.MethodPost, path, strings.NewReader(values.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -202,121 +171,100 @@ func (c *Client) newFormRequest(ctx context.Context, query string, values url.Va
 
 	if c.crumbs != nil {
 		req.Header.Add(c.crumbs.RequestField, c.crumbs.Value)
-		// crumbs are only valid for one request.
 		c.crumbs = nil
 	}
+
 	return req, nil
 }
 
-// get issues a GET to the specified path.
-func (c *Client) get(ctx context.Context, query string) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "GET", query, nil)
+func (c *Client) get(ctx context.Context, path string) (*http.Response, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return resp, err
+		return nil, err
 	}
 
 	if resp.StatusCode > 299 {
-		return resp, fmt.Errorf("%d %s", resp.StatusCode, resp.Status)
-	}
-
-	if c.httpClient.Jar != nil {
-		for _, cookie := range resp.Cookies() {
-			c.httpClient.Jar.SetCookies(req.URL, []*http.Cookie{cookie})
-		}
+		return resp, fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
 	}
 
 	return resp, nil
 }
 
-// convertBodyStruct is a helper function to convert a struct to url.Values.
 func convertBodyStruct(body interface{}) url.Values {
 	values := make(url.Values)
-	iVal := reflect.ValueOf(body).Elem()
-	typ := iVal.Type()
-	for i := 0; i < iVal.NumField(); i++ {
-		j := typ.Field(i).Tag.Get("json")
-		if j == "" {
-			j = typ.Field(i).Name
+	v := reflect.ValueOf(body).Elem()
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("json")
+		if tag == "" {
+			tag = field.Name
 		}
-		values.Set(j, fmt.Sprint(iVal.Field(i)))
+		values.Set(tag, fmt.Sprint(v.Field(i)))
 	}
 
 	return values
 }
 
-// postForm issues form data to the specified path with the given parameters.
-func (c *Client) postForm(ctx context.Context, query string, body interface{}) (*http.Response, error) {
-	crumbsResp, err := c.setCrumbs(ctx)
-	if err != nil {
-		return crumbsResp, err
+func (c *Client) postForm(ctx context.Context, path string, body interface{}) (*http.Response, error) {
+	if err := c.setCrumbs(ctx); err != nil {
+		return nil, err
 	}
 
 	values := convertBodyStruct(body)
 
-	req, _ := c.newFormRequest(ctx, query, values)
+	req, err := c.newFormRequest(ctx, path, values)
+	if err != nil {
+		return nil, err
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return resp, err
+		return nil, err
 	}
-
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
 
 	if resp.StatusCode > 299 {
-		return resp, fmt.Errorf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-	}
-
-	if c.httpClient.Jar != nil {
-		for _, cookie := range resp.Cookies() {
-			c.httpClient.Jar.SetCookies(req.URL, []*http.Cookie{cookie})
-		}
+		return resp, fmt.Errorf("HTTP error: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 
 	return resp, nil
 }
 
-// post issues a POST to the specified path with the given body.
-func (c *Client) post(ctx context.Context, query string, body interface{}) (*http.Response, error) {
-	crumbsResp, err := c.setCrumbs(ctx)
-	if err != nil {
-		return crumbsResp, err
+func (c *Client) post(ctx context.Context, path string, body interface{}) (*http.Response, error) {
+	if err := c.setCrumbs(ctx); err != nil {
+		return nil, err
 	}
 
-	j, err := xml.Marshal(body)
+	b, err := xml.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
-	bodyR := strings.NewReader(string(j))
-	req, _ := c.newRequest(ctx, "POST", query, bodyR)
+	req, err := c.newRequest(ctx, http.MethodPost, path, strings.NewReader(string(b)))
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("Content-Type", "application/xml")
 
 	if c.crumbs != nil {
 		req.Header.Add(c.crumbs.RequestField, c.crumbs.Value)
-		// crumbs are only valid for one request.
 		c.crumbs = nil
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return resp, err
+		return nil, err
 	}
 
 	if resp.StatusCode > 299 {
-		return resp, fmt.Errorf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-	}
-
-	if c.httpClient.Jar != nil {
-		for _, cookie := range resp.Cookies() {
-			c.httpClient.Jar.SetCookies(req.URL, []*http.Cookie{cookie})
-		}
+		return resp, fmt.Errorf("HTTP error: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 
 	return resp, nil

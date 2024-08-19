@@ -251,9 +251,8 @@ func (s *Suite) TestClientSetCrumbs() {
 	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
-	got, err := client.setCrumbs(context.Background())
+	err = client.setCrumbs(context.Background())
 	s.NoError(err)
-	s.Equal(got.StatusCode, http.StatusOK)
 }
 
 func (s *Suite) TestClientSetCrumbsErrorGet() {
@@ -267,7 +266,7 @@ func (s *Suite) TestClientSetCrumbsErrorGet() {
 
 	//lint:ignore SA1012 this is a test
 	//nolint
-	_, err = client.setCrumbs(nil)
+	err = client.setCrumbs(nil)
 	s.Error(err)
 }
 
@@ -284,7 +283,7 @@ func (s *Suite) TestClientSetCrumbsErrorUnmarshal() {
 	client, err := NewClient(WithBaseURL(s.server.URL), WithUserPassword("admin", "admin"))
 	s.NoError(err)
 
-	_, err = client.setCrumbs(context.Background())
+	err = client.setCrumbs(context.Background())
 	s.Error(err)
 }
 
